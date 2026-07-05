@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordFall</title>
+    <style>
+        body { 
+            font-family: system-ui, sans-serif; 
+            background: radial-gradient(circle at top, #6a1b9a, #311b92, #0d001a); 
+            background-attachment: fixed;
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 40px; 
+            margin: 0; 
+            min-height: 100vh;
+        }
+        
+        .screen { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; }
+        .screen.active { display: flex; }
+        input { padding: 10px; margin-bottom: 10px; width: 100%; box-sizing: border-box; border-radius: 4px; border: none; }
+        
+        .btn { padding: 12px 20px; font-size: 16px; background: #4caf50; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px; transition: transform 0.1s; box-shadow: 0 4px 0 #388e3c; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 0 0 #388e3c; }
+        .btn:hover { background: #45a049; } 
+        .btn.secondary { background: #1976d2; box-shadow: 0 4px 0 #0d47a1; } .btn.secondary:active { box-shadow: 0 0 0 #0d47a1; }
+        .btn.danger { background: #d32f2f; box-shadow: 0 4px 0 #b71c1c; } .btn.danger:active { box-shadow: 0 0 0 #b71c1c; }
+        
+        .error-text { color: #ef5350; font-size: 14px; margin-bottom: 10px; text-align: center; }
+
+        .map-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; width: 100%; margin-top: 20px; padding-bottom: 40px; }
+        .level-btn { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; background: #ffd54f; color: #333; border-radius: 12px; cursor: pointer; border: none; box-shadow: 0 4px 0 #c7a000; transition: transform 0.1s; }
+        .level-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #c7a000; }
+        .level-btn:disabled { background: #444; color: #666; cursor: not-allowed; box-shadow: none; transform: none; }
+        .level-btn.current { box-shadow: 0 0 15px #00e5ff, 0 4px 0 #c7a000; border: 2px solid #00e5ff; }
+        .map-header { display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+
+        .candy-header {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 440px; margin-bottom: 20px; padding: 15px 20px; box-sizing: border-box;
+            background: linear-gradient(to bottom, #7b1fa2, #4a148c);
+            border: 3px solid #ab47bc;
+            border-radius: 20px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.3);
+        }
+        .stats { 
+            font-size: 1.1rem; font-weight: 900; background: rgba(0,0,0,0.4); 
+            padding: 8px 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);
+            text-shadow: 1px 1px 2px black;
+        }
+        .title-box { 
+            font-size: 1.4rem; font-weight: 900; color: #fff176; 
+            text-shadow: 2px 2px 0 #f57f17, 0 4px 5px rgba(0,0,0,0.6);
+            text-transform: uppercase;
+        }
+        
+        #game-board { 
+            display: grid; grid-template-columns: repeat(10, 40px); grid-template-rows: repeat(10, 40px);
+            gap: 6px; 
+            background: #1a0033;
+            padding: 10px 10px 26px 10px; border-radius: 12px; 
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        
+        .cell-even { background: #7e57c2; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+        .cell-odd  { background: #3a1a6b; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+        
+        .tile { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; cursor: pointer; user-select: none; position: relative; }
+        .tile[data-value="QU"] { font-size: 14px; letter-spacing: -1px; } 
+
+        .tile.empty {
+            background: #1a0033;
+            box-shadow: none;
+            border-radius: 0;
+            cursor: default;
+        }
+
+        .tile.collection-point {
+            z-index: 10; /* Keep the entire collection point above lower tiles so arrow doesn't clip */
+        }
+
+        .tile.collection-point::after {
+            content: '\2193';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 18px; height: 18px;
+            background: #4caf50;
+            color: #fff;
+            border-radius: 50%;
+            font-size: 13px;
+            line-height: 18px;
+            font-weight: 900;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 -2px 0 rgba(0,0,0,0.2);
+            border: 1.5px solid #2e7d32;
+            z-index: 15;
+            pointer-events: none;
+        }
+        
+        .tile.letter { background: #fafafa; color: #333; border-bottom: 3px solid #ccc; transition: background 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .tile.letter.selected { background: #ffd54f; border-bottom: 3px solid #ffb300; transform: scale(0.90); }
+        
+        .tile.star { 
+            background: transparent !important; 
+            border: none !important; 
+            box-shadow: none !important; 
+            font-size: 32px; 
+            color: #ffeb3b; 
+            text-shadow: 0 0 10px #f57f17, 0 0 25px #ff9800; 
+            animation: starPulse 1.5s infinite alternate; 
+            pointer-events: none;
+        }
+        @keyframes starPulse {
+            0% { transform: scale(0.8) rotate(-5deg); filter: brightness(1); }
+            100% { transform: scale(1.1) rotate(5deg); filter: brightness(1.2); }
+        }
+
+        .tile.blocker {
+            color: #fff; font-size: 12px; font-weight: 900;
+            text-shadow: 1px 1px 2px #000;
+            box-sizing: border-box; cursor: default;
+            display: flex; align-items: center; justify-content: center;
+            isolation: isolate; 
+            background: transparent !important; /* Forces the default board-cell purple to hide */
+            box-shadow: none !important;        /* Removes default board-cell shadows */
+        }
+
+        .tile.blocker::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            box-sizing: border-box;
+            border-radius: inherit;
+        }
+
+        /* HP1: almost broken — pale, heavily chipped */
+        .tile.blocker[data-hp="1"]::before {
+            background: radial-gradient(circle at 30% 30%, #efebe9, #a1887f 70%, #6d4c41);
+            clip-path: polygon(18% 8%, 60% 0, 88% 12%, 100% 45%, 92% 82%, 65% 100%, 25% 92%, 0 60%, 6% 25%);
+            box-shadow: inset -4px -4px 6px rgba(0,0,0,0.5);
+        }
+        .tile.blocker[data-hp="1"] { color: #3e2723; text-shadow: none; }
+        
+        /* HP2: light brown, cracked corners */
+        .tile.blocker[data-hp="2"]::before {
+            background: radial-gradient(circle at 35% 30%, #d7ccc8, #8d6e63 65%, #4e342e);
+            clip-path: polygon(10% 4%, 90% 0, 100% 30%, 96% 92%, 70% 100%, 12% 96%, 0 55%);
+            box-shadow: inset -3px -3px 6px rgba(0,0,0,0.55);
+            border-radius: 4px;
+        }
+        
+        /* HP3: medium brown, slightly chipped */
+        .tile.blocker[data-hp="3"]::before {
+            background: radial-gradient(circle at 35% 30%, #a1887f, #5d4037 70%, #3e2723);
+            clip-path: polygon(5% 3%, 95% 0, 100% 92%, 90% 100%, 5% 96%, 0 25%);
+            box-shadow: inset -3px -3px 5px rgba(0,0,0,0.6);
+            border-radius: 6px;
+        }
+        
+        /* HP4: grey stone, mostly square */
+        .tile.blocker[data-hp="4"]::before {
+            background: radial-gradient(circle at 35% 30%, #9e9e9e, #424242 75%, #212121);
+            border: 2px solid #212121;
+            border-radius: 6px;
+            box-shadow: inset -2px -2px 4px rgba(0,0,0,0.75), inset 2px 2px 3px rgba(255,255,255,0.18);
+        }
+        
+        /* HP5: dark stone, solid square */
+        .tile.blocker[data-hp="5"]::before {
+            background: radial-gradient(circle at 35% 30%, #546e7a, #263238 75%, #000);
+            border: 3px solid #000;
+            border-radius: 5px;
+            box-shadow: inset -2px -2px 5px rgba(0,0,0,0.9), inset 2px 2px 3px rgba(255,255,255,0.2);
+        }
+        
+        /* HP6: fully solid obsidian, glowing edge */
+        .tile.blocker[data-hp="6"]::before {
+            background: linear-gradient(135deg, #212121, #000 70%);
+            border: 3px solid #000;
+            border-radius: 4px;
+            box-shadow: inset -2px -2px 8px rgba(0,0,0,1), inset 3px 3px 4px rgba(255,255,255,0.28), 0 0 8px rgba(170,0,255,0.55);
+        }
+        .tile.blocker[data-hp="6"] { color: #ea80fc; }
+        
+        /* HP7+ retained purple-glow variant */
+        .tile.blocker[data-hp="7"]::before, .tile.blocker[data-hp="8"]::before, .tile.blocker[data-hp="9"]::before {
+            background: #000; border: 3px solid #000;
+            border-radius: 4px;
+            box-shadow: inset 0 0 12px #aa00ff, inset 0 0 0 2px rgba(255,255,255,0.25);
+        }
+        .tile.blocker[data-hp="7"], .tile.blocker[data-hp="8"], .tile.blocker[data-hp="9"] { color: #ea80fc; }
+
+        .moon { 
+            position: absolute; top: -4px; right: -4px; font-size: 14px; 
+            filter: hue-rotate(170deg) drop-shadow(0px 0px 4px #00e5ff); 
+            z-index: 10;
+        }
+
+        @keyframes popOut {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.8; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .tile.removed { animation: popOut 0.3s forwards ease-in-out; pointer-events: none; }
+
+        @keyframes moonStrike {
+            0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.8); transform: scale(1); background-color: #fff; }
+            50% { box-shadow: 0 0 20px 10px rgba(0, 229, 255, 0); transform: scale(1.15); background-color: #b2ebf2; }
+            100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); transform: scale(1); background-color: #fff; }
+        }
+        .tile.struck { animation: moonStrike 0.4s ease-out; z-index: 20; position: relative; }
+
+        .action-area {
+            display: flex;
+            width: 100%;
+            margin-top: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .text-area { display: flex; flex-direction: column; flex-grow: 1; }
+        #current-word { height: 30px; font-size: 24px; letter-spacing: 4px; font-weight: bold; color: #ffd54f; display: flex; align-items: center; }
+        #message { height: 20px; font-size: 14px; font-weight: bold; margin-top: 5px; }
+        #submit-btn { width: 140px; padding: 15px 10px; font-size: 16px; margin: 0; flex-shrink: 0; }
+        #submit-btn:disabled { background: #555; color: #888; cursor: not-allowed; box-shadow: none; transform: none; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen" class="screen">
+        <h1 style="color: #ffd54f; text-shadow: 0 4px 10px rgba(0,0,0,0.5);">WordFall</h1>
+        <input type="text" id="username" placeholder="Username">
+        <input type="text" id="full-name" placeholder="Full Name">
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="password" placeholder="Password">
+        <div id="auth-error" class="error-text"></div>
+        <button id="login-btn" class="btn">Log In</button>
+        <button id="signup-btn" class="btn secondary">Sign Up</button>
+    </div>
+
+    <div id="map-screen" class="screen">
+        <div class="map-header">
+            <h2>Select Level</h2>
+            <h2 id="username-display" style="margin: 0; font-size: 1.2rem; color: #ffd54f;"></h2>
+            <button id="logout-btn" class="btn danger" style="width: auto; margin:0; padding: 8px 15px;">Logout</button>
+        </div>
+        <div id="map-grid" class="map-grid"></div>
+    </div>
+
+    <div id="game-screen" class="screen" style="max-width: 440px;">
+        <div style="width: 100%; display: flex; justify-content: flex-start; margin-bottom: 10px;">
+            <button id="back-to-map-btn" class="btn secondary" style="width: auto; padding: 8px 15px;">&larr; Map</button>
+        </div>
+        
+        <div class="candy-header">
+            <div class="stats">Moves: <span id="moves-left" style="color: #ffeb3b;">-</span></div>
+            <div class="title-box" id="level-name">Level</div>
+            <div class="stats">Stars: <span id="stars-ui" style="color: #64b5f6;">0 / 0</span></div>
+        </div>
+
+        <div id="game-board"></div>
+        
+        <div class="action-area">
+            <div class="text-area">
+                <div id="current-word"></div>
+                <div id="message"></div>
+            </div>
+            <button id="submit-btn" class="btn" disabled>PLAY WORD</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+        const SUPABASE_URL = 'https://cmdnzxnlcvtkenkzvgke.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG56eG5sY3Z0a2Vua3p2Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMzg5ODgsImV4cCI6MjA5ODcxNDk4OH0.7mFyIrVf1gLlrtVWcSFlj7WU8_zCbQ1Pg4Hguctor0M';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let allLevels = [];
+        let unlockedIndex = 0; 
+        
+        let currentLevelIndex = 0;
+        let gameState = [];
+        let selectedTiles = [];
+        let movesLeft = 0;
+        let starsCollected = 0;
+        let totalStars = 0;
+        let gameOver = false;
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        const ALPHABET = "AAAAAAAAABBCCDDDDEEEEEEEEEEEEFFGGGHHIIIIIIIIIJKLLLLMMNNNNNNOOOOOOOOPPQRRRRRRSSSSTTTTTTUUUUVVWWXYYZ";
+        const getRandomLetter = () => {
+            let letter = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+            return letter === 'Q' ? 'QU' : letter; 
+        };
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            const loginBtn = document.getElementById('login-btn');
+            if (loginBtn) loginBtn.addEventListener('click', () => authAction('signInWithPassword'));
+            const signupBtn = document.getElementById('signup-btn');
+            if (signupBtn) signupBtn.addEventListener('click', () => authAction('signUp'));
+            document.getElementById('logout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); currentUser = null; showScreen('auth-screen'); });
+            document.getElementById('back-to-map-btn').addEventListener('click', () => { showScreen('map-screen'); renderMap(); });
+            document.getElementById('submit-btn').addEventListener('click', () => { if (gameOver) { showScreen('map-screen'); renderMap(); } else processTurn(); });
+        });
+
+        async function checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) { currentUser = session.user; await loadMapData(); showScreen('map-screen'); } 
+            else showScreen('auth-screen');
+        }
+        
+        async function authAction(method) {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const username = document.getElementById('username').value;
+            const fullName = document.getElementById('full-name').value;
+            
+            let payload = { email, password };
+            
+            // Only add metadata if we are signing up
+            if (method === 'signUp') {
+                payload.options = {
+                    data: { username, full_name: fullName }
+                };
+            }
+
+            const { data, error } = await supabase.auth[method](payload);
+            
+            if (error) {
+                document.getElementById('auth-error').textContent = error.message;
+            } else {
+                document.getElementById('auth-error').textContent = "";
+                currentUser = data.user;
+                
+                // If this is a new signup, you might want to manually insert the user into your 
+                // own 'profiles' table here using the data.user.id
+                await loadMapData();
+                showScreen('map-screen');
+            }
+        }
+
+        async function loadMapData() {
+            const { data: levels } = await supabase.from('levels').select('*').order('sort_order', { ascending: true });
+            allLevels = levels || [];
+            // 2. NEW: Fetch Username and set text
+            const { data: profile } = await supabase.from('profiles').select('username').eq('id', currentUser.id).single();
+            if (profile) {
+                document.getElementById('username-display').textContent = `Welcome, ${profile.username}!`;
+            }
+            const { data: progress } = await supabase.from('user_progress').select('unlocked_index').eq('user_id', currentUser.id).single();
+            if (progress) unlockedIndex = progress.unlocked_index;
+            else { await supabase.from('user_progress').insert([{ user_id: currentUser.id, unlocked_index: 0 }]); unlockedIndex = 0; }
+            renderMap();
+        }
+
+        function renderMap() {
+            const grid = document.getElementById('map-grid');
+            grid.innerHTML = "";
+            let latestUnlockedBtn = null;
+
+            allLevels.forEach((level, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'level-btn';
+                btn.textContent = index > unlockedIndex ? "🔒" : index + 1;
+                btn.disabled = index > unlockedIndex;
+                
+                if (index === unlockedIndex) {
+                    btn.classList.add('current');
+                    latestUnlockedBtn = btn;
+                }
+
+                if(!btn.disabled) btn.addEventListener('click', () => startGame(index));
+                grid.appendChild(btn);
+            });
+
+            if (latestUnlockedBtn) {
+                setTimeout(() => {
+                    latestUnlockedBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+
+        function startGame(index) {
+            currentLevelIndex = index;
+            const level = allLevels[index];
+            window.scrollTo({ top: 0, behavior: 'smooth' }); 
+            
+            movesLeft = parseInt(level.target_moves) || 15;
+            selectedTiles = [];
+            starsCollected = 0;
+            totalStars = 0;
+            gameOver = false;
+            
+            document.getElementById('message').textContent = "";
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.textContent = 'PLAY WORD';
+            submitBtn.disabled = true;
+            document.getElementById('level-name').textContent = level.name;
+
+            gameState = level.grid_data.map((row, y) => 
+                row.map((cell, x) => {
+                    let tile = { ...cell, x, y, moons: 0, isStruck: false }; 
+                    if (tile.type === 'random_letter') { tile.type = 'letter'; tile.value = getRandomLetter(); }
+                    if (tile.type === 'specific_letter') { tile.type = 'letter'; if (tile.value === 'Q') tile.value = 'QU'; }
+                    if (tile.type === 'star') totalStars++;
+                    return tile;
+                })
+            );
+
+            updateTopUI();
+            renderBoard();
+            showScreen('game-screen');
+        }
+
+        function renderBoard() {
+            const boardElement = document.getElementById('game-board');
+            boardElement.innerHTML = '';
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                    const tile = gameState[y][x];
+                    const div = document.createElement('div');
+                    
+                    const isEven = (x + y) % 2 === 0;
+                    div.className = `tile ${isEven ? 'cell-even' : 'cell-odd'} ${tile.type}`;
+
+                    const belowEmpty = y === 9 || (gameState[y + 1] && gameState[y + 1][x].type === 'empty');
+                    if (belowEmpty && tile.type !== 'empty') {
+                        div.classList.add('collection-point');
+                    }
+                    
+                    if (tile.isStruck) div.classList.add('struck'); 
+                    if (tile.value) div.setAttribute('data-value', tile.value);
+                    
+                    if (tile.type === 'letter') {
+                        div.textContent = tile.value;
+                    } else if (tile.type === 'blocker') {
+                        div.textContent = tile.value; 
+                        div.setAttribute('data-hp', tile.value); 
+                    } else if (tile.type === 'star') {
+                        div.textContent = '★'; 
+                    }
+
+                    if (tile.moons > 0 && tile.type === 'letter' && tile.type !== 'removed') {
+                        const moonIcon = document.createElement('div');
+                        moonIcon.className = 'moon';
+                        moonIcon.textContent = '🌙'; 
+                        div.appendChild(moonIcon);
+                    }
+
+                    if (selectedTiles.some(t => t.x === x && t.y === y)) div.classList.add('selected');
+                    if (tile.type === 'letter' && !gameOver) div.addEventListener('click', () => toggleTileSelection(tile, x, y));
+
+                    boardElement.appendChild(div);
+                }
+            }
+        }
+
+        function toggleTileSelection(tile, x, y) {
+            document.getElementById('message').textContent = ""; 
+            const existingIndex = selectedTiles.findIndex(t => t.x === x && t.y === y);
+            
+            if (existingIndex !== -1) {
+                if (existingIndex === selectedTiles.length - 1) selectedTiles.pop();
+            } else {
+                if (selectedTiles.length > 0) {
+                    const last = selectedTiles[selectedTiles.length - 1];
+                    const dx = Math.abs(last.x - x), dy = Math.abs(last.y - y);
+                    if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) return; 
+                }
+                selectedTiles.push({ ...tile, x, y });
+            }
+
+            renderBoard();
+            const word = selectedTiles.map(t => t.value).join('');
+            document.getElementById('current-word').textContent = word;
+            
+            if (gameOver) document.getElementById('submit-btn').disabled = false;
+            else document.getElementById('submit-btn').disabled = word.length < 3;
+        }
+
+        function updateTopUI() {
+            document.getElementById('moves-left').textContent = movesLeft;
+            document.getElementById('stars-ui').textContent = `${starsCollected} / ${totalStars}`;
+        }
+
+        async function triggerMoonEffect() {
+            let blockers = [];
+            let underStars = [];
+            
+            for(let y=0; y<10; y++) {
+                for(let x=0; x<10; x++) {
+                    if (gameState[y][x].type === 'blocker') blockers.push(gameState[y][x]);
+                    if (gameState[y][x].type === 'star') {
+                        for (let sy = y + 1; sy < 10; sy++) {
+                            if (gameState[sy][x].type === 'letter') underStars.push(gameState[sy][x]);
+                        }
+                    }
+                }
+            }
+
+            let target = null;
+            let isBlocker = false;
+
+            if (blockers.length > 0) {
+                target = blockers[Math.floor(Math.random() * blockers.length)];
+                isBlocker = true;
+            } else if (underStars.length > 0) {
+                target = underStars[Math.floor(Math.random() * underStars.length)];
+            }
+
+            if (target) {
+                target.isStruck = true;
+                renderBoard();
+                await sleep(350); 
+                
+                target.isStruck = false;
+                if (isBlocker) {
+                    target.value--;
+                    if (target.value <= 0) target.type = 'removed';
+                } else {
+                    target.type = 'removed';
+                }
+            }
+        }
+
+        async function processTurn() {
+            const word = selectedTiles.map(t => t.value).join('');
+            const tileCount = selectedTiles.length;
+            const submitBtn = document.getElementById('submit-btn');
+            const msgDisplay = document.getElementById('message');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'CHECKING...';
+
+            try {
+                const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+                if (!res.ok) throw new Error();
+            } catch (e) {
+                msgDisplay.textContent = `"${word}" is not valid.`;
+                msgDisplay.style.color = "#ffeb3b";
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'PLAY WORD';
+                selectedTiles = [];
+                renderBoard();
+                document.getElementById('current-word').textContent = "";
+                return;
+            }
+
+            movesLeft--;
+            updateTopUI();
+
+            let consumedMoons = 0;
+            selectedTiles.forEach(t => {
+                if (gameState[t.y][t.x].moons > 0) consumedMoons += gameState[t.y][t.x].moons;
+            });
+
+            if (consumedMoons > 0) {
+                msgDisplay.textContent = `🌙 Moon activated! (${consumedMoons})`;
+                msgDisplay.style.color = "#4fc3f7";
+                for (let i = 0; i < consumedMoons; i++) {
+                    await triggerMoonEffect();
+                }
+            }
+
+            const damaged = new Set();
+            const orthogonalDirections = [[0, 1], [0, -1], [1, 0], [-1, 0]]; 
+            
+            selectedTiles.forEach(tile => {
+                orthogonalDirections.forEach(([dx, dy]) => {
+                    let nx = tile.x + dx;
+                    let ny = tile.y + dy;
+                    
+                    if (nx >= 0 && nx < 10 && ny >= 0 && ny < 10) {
+                        let neighbor = gameState[ny][nx];
+                        if (neighbor.type === 'blocker' && !damaged.has(`${nx},${ny}`)) {
+                            neighbor.value--;
+                            damaged.add(`${nx},${ny}`);
+                            if (neighbor.value <= 0) neighbor.type = 'removed';
+                        }
+                    }
+                });
+            });
+
+            selectedTiles.forEach(t => { gameState[t.y][t.x].type = 'removed'; });
+            selectedTiles = [];
+            renderBoard(); 
+            
+            await sleep(300); 
+
+            let settling = true;
+            while(settling) {
+                for (let x = 0; x < 10; x++) {
+                    for (let y = 9; y >= 0; y--) {
+                        if (gameState[y][x].type === 'removed') {
+                            let foundTile = false;
+                            for (let lookY = y - 1; lookY >= 0; lookY--) {
+                                let lookTile = gameState[lookY][x];
+                                if (lookTile.type === 'blocker' || lookTile.type === 'empty') break;
+                                if (lookTile.type === 'letter' || lookTile.type === 'star') {
+                                    gameState[y][x] = { ...lookTile, x, y };
+                                    gameState[lookY][x] = { type: 'removed', x, y: lookY };
+                                    foundTile = true; break;
+                                }
+                            }
+                            if (!foundTile) gameState[y][x] = { type: 'letter', value: getRandomLetter(), x, y, moons: 0, isStruck: false };
+                        }
+                    }
+                }
+
+                let starsFell = false;
+                for (let y = 0; y < 10; y++) {
+                    for (let x = 0; x < 10; x++) {
+                        if (gameState[y][x].type === 'star') {
+                            const atBottom = y === 9;
+                            const emptyBelow = !atBottom && gameState[y + 1][x].type === 'empty';
+                            if (atBottom || emptyBelow) {
+                                gameState[y][x].type = 'removed';
+                                starsCollected++;
+                                starsFell = true;
+                            }
+                        }
+                    }
+                }
+                if (!starsFell) settling = false;
+            }
+
+            if (tileCount >= 6) {
+                let moonsToSpawn = tileCount - 5;
+                let availableTiles = [];
+                for(let y=0; y<10; y++) {
+                    for(let x=0; x<10; x++) {
+                        if (gameState[y][x].type === 'letter') availableTiles.push(gameState[y][x]);
+                    }
+                }
+                for (let i = 0; i < moonsToSpawn; i++) {
+                    if (availableTiles.length > 0) {
+                        let t = availableTiles[Math.floor(Math.random() * availableTiles.length)];
+                        t.moons = (t.moons || 0) + 1;
+                    }
+                }
+            }
+
+            document.getElementById('current-word').textContent = "";
+            submitBtn.textContent = 'PLAY WORD';
+            
+            updateTopUI();
+            renderBoard();
+            handleWinLoss();
+        }
+
+        async function handleWinLoss() {
+            const msgDisplay = document.getElementById('message');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (starsCollected >= totalStars && totalStars > 0) {
+                gameOver = true;
+                msgDisplay.style.color = "#4caf50";
+                msgDisplay.textContent = "LEVEL COMPLETE!";
+                submitBtn.textContent = "CONTINUE TO MAP";
+                submitBtn.disabled = false;
+
+                if (currentLevelIndex === unlockedIndex) {
+                    unlockedIndex++;
+                    await supabase.from('user_progress').upsert({ user_id: currentUser.id, unlocked_index: unlockedIndex });
+                }
+            } else if (movesLeft <= 0) {
+                gameOver = true;
+                msgDisplay.style.color = "#f44336";
+                msgDisplay.textContent = "OUT OF MOVES!";
+                submitBtn.textContent = "TRY AGAIN";
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
