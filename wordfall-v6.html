@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordFall</title>
+    <style>
+        body { 
+            font-family: system-ui, sans-serif; 
+            /* Default background is now Purple for Normal Levels */
+            background: radial-gradient(circle at top, #7b1fa2, #4a148c, #1a0033); 
+            background-attachment: fixed;
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 40px; 
+            margin: 0; 
+            min-height: 100vh;
+            transition: background 0.4s ease;
+        }
+        
+        /* Dynamic Backgrounds based on level difficulty */
+        body.hard-bg { background: radial-gradient(circle at top, #f57c00, #e65100, #3e2723); }
+        body.super-hard-bg { background: radial-gradient(circle at top, #d32f2f, #b71c1c, #330000); }
+        
+        .screen { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; }
+        .screen.active { display: flex; }
+        input { padding: 10px; margin-bottom: 10px; width: 100%; box-sizing: border-box; border-radius: 4px; border: none; }
+        
+        .btn { padding: 12px 20px; font-size: 16px; background: #4caf50; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px; transition: transform 0.1s; box-shadow: 0 4px 0 #388e3c; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 0 0 #388e3c; }
+        .btn:hover { background: #45a049; } 
+        .btn.secondary { background: #2196f3; box-shadow: 0 4px 0 #1565c0; } .btn.secondary:active { box-shadow: 0 0 0 #1565c0; } .btn.secondary:hover { background:#1e88e5; }
+        .btn.danger { background: #d32f2f; box-shadow: 0 4px 0 #b71c1c; } .btn.danger:active { box-shadow: 0 0 0 #b71c1c; }
+        
+        .error-text { color: #ef5350; font-size: 14px; margin-bottom: 10px; text-align: center; }
+
+        /* Roadmap Styles */
+        .map-header { display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .map-wrapper {
+            width: 100%;
+            height: 65vh;
+            overflow-y: auto;
+            border-radius: 20px;
+            background:
+                radial-gradient(circle at 20% 10%, rgba(156, 39, 176, 0.18), transparent 45%),
+                radial-gradient(circle at 80% 85%, rgba(255,167,38,0.12), transparent 50%),
+                linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55));
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.7), 0 8px 24px rgba(0,0,0,0.55);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            position: relative;
+        }
+        .map-wrapper::-webkit-scrollbar { width: 10px; }
+        .map-wrapper::-webkit-scrollbar-thumb { background-color: #7b1fa2; border-radius: 10px; }
+        
+        .map-container {
+            position: relative;
+            width: 100%;
+            padding: 40px 0 60px;
+        }
+        .map-path {
+            position: absolute; inset: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .map-path path.trail { fill: none; stroke: rgba(255,255,255,0.12); stroke-width: 14; stroke-linecap: round; }
+        .map-path path.dashes { fill: none; stroke: rgba(255,255,255,0.55); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 2 14; }
+
+        .level-slot {
+            position: relative;
+            width: 100%;
+            height: 92px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+        .level-slot .slot-inner {
+            position: relative;
+            transition: transform 0.15s;
+        }
+
+        /* Normal Level Styling (Purple) */
+        .level-btn { 
+            width: 72px; height: 72px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 26px; font-weight: 900; 
+            background: radial-gradient(circle at 32% 28%, #e1bee7, #ab47bc 55%, #6a1b9a);
+            color: #ffffff;
+            text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+            border-radius: 50%;
+            cursor: pointer; border: 3px solid #6a1b9a; 
+            box-shadow: 0 6px 0 #4a148c, 0 10px 18px rgba(0,0,0,0.45), inset 0 -6px 8px rgba(0,0,0,0.15), inset 0 4px 6px rgba(255,255,255,0.6); 
+            transition: transform 0.1s; 
+            position: relative;
+            z-index: 2;
+        }
+        .level-btn:active { transform: translateY(6px); box-shadow: 0 0 0 #4a148c, 0 4px 10px rgba(0,0,0,0.5); }
+        .level-btn:disabled { background: #444; color: #666; border-color: #333; cursor: not-allowed; box-shadow: inset 0 0 10px #222; transform: none; }
+        .level-btn.current { box-shadow: 0 0 25px #ce93d8, 0 6px 0 #4a148c; border: 3px solid #ce93d8; }
+
+        /* Hard Level Styling (Orange) */
+        .level-btn.hard {
+            background: radial-gradient(circle at 32% 28%, #ffcc80, #fb8c00 55%, #e65100); color: white;
+            border-color: #ffe0b2;
+            box-shadow: 0 6px 0 #ef6c00, 0 8px 15px rgba(0,0,0,0.5);
+        }
+        .level-btn.hard.current { box-shadow: 0 0 25px #ffe0b2, 0 6px 0 #ef6c00; border-color: #ffe0b2;}
+        .level-btn.hard::after { content: "🔥"; position: absolute; top: -15px; right: -15px; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .level-btn.hard:disabled::after { filter: grayscale(100%); opacity: 0.5; }
+
+        /* Super Hard Level Styling (Dark Red) */
+        .level-btn.super-hard {
+            background: radial-gradient(circle at 32% 28%, #ef9a9a, #c62828 55%, #7f0000); color: white;
+            border-color: #ef9a9a;
+            box-shadow: 0 6px 0 #7f0000, 0 8px 15px rgba(0,0,0,0.5), inset 0 0 15px rgba(0,0,0,0.5);
+        }
+        .level-btn.super-hard.current { box-shadow: 0 0 25px #ef9a9a, 0 6px 0 #7f0000; border-color: #ef9a9a; }
+        .level-btn.super-hard::after { content: "💀"; position: absolute; top: -15px; right: -15px; font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+        .level-btn.super-hard:disabled::after { filter: grayscale(100%); opacity: 0.5; }
+
+        /* Top Bar Candy Header (Normal is Purple) */
+        .candy-header {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 440px; margin-bottom: 20px; padding: 15px 20px; box-sizing: border-box;
+            background: linear-gradient(to bottom, #7b1fa2, #4a148c);
+            border: 3px solid #ce93d8;
+            border-radius: 20px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        /* Top Bar Difficulty Styles */
+        .candy-header.hard {
+            background: linear-gradient(to bottom, #fb8c00, #ef6c00);
+            border-color: #ffe0b2;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.6), inset 0 2px 5px rgba(255,255,255,0.4), 0 0 15px rgba(255, 167, 38, 0.4);
+        }
+        .candy-header.super-hard {
+            background: linear-gradient(to bottom, #d32f2f, #b71c1c);
+            border-color: #ff8a80;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.6), inset 0 2px 5px rgba(255,255,255,0.4), 0 0 15px rgba(255, 138, 128, 0.4);
+        }
+
+        .stats { 
+            font-size: 1.1rem; font-weight: 900; background: rgba(0,0,0,0.4); 
+            padding: 8px 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);
+            text-shadow: 1px 1px 2px black;
+        }
+        .title-box { 
+            font-size: 1.4rem; font-weight: 900; color: #fff176; 
+            text-shadow: 2px 2px 0 #f57f17, 0 4px 5px rgba(0,0,0,0.6);
+            text-transform: uppercase; display: flex; align-items: center; justify-content: center;
+        }
+        
+        #game-screen { position: relative; } 
+        
+        /* Ending Banner (Normal is Purple) */
+        .banner-overlay {
+            position: absolute; top: 40%; left: 0; width: 100%; z-index: 100;
+            background: linear-gradient(to bottom, #7b1fa2, #4a148c);
+            border-top: 4px solid #ce93d8; border-bottom: 4px solid #ce93d8;
+            color: #fff176; text-align: center; padding: 25px 0;
+            font-size: 32px; font-weight: 900; letter-spacing: 2px;
+            text-shadow: 2px 2px 0 #f57f17, 0 4px 5px rgba(0,0,0,0.6);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            display: none; align-items: center; justify-content: center;
+            animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .banner-overlay.hard { background: linear-gradient(to bottom, #fb8c00, #ef6c00); border-color: #ffe0b2; }
+        .banner-overlay.super-hard { 
+            background: linear-gradient(to bottom, #d32f2f, #b71c1c); 
+            border-color: #ff8a80; 
+            color: #fff; text-shadow: 2px 2px 0 #b71c1c, 0 4px 5px rgba(0,0,0,0.8); 
+        }
+        @keyframes slideIn { 0% { transform: scaleY(0); opacity: 0; } 100% { transform: scaleY(1); opacity: 1; } }
+
+        #game-board { 
+            display: grid; grid-template-columns: repeat(10, 40px); grid-template-rows: repeat(10, 40px);
+            gap: 6px; 
+            background: #1a0033;
+            padding: 10px 10px 26px 10px; border-radius: 12px; 
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        
+        .cell-even { background: #7e57c2; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+        .cell-odd  { background: #3a1a6b; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+        
+        /* Hard Theme Board Styling (No inner borders, white text on dark tiles) */
+        body.hard-bg .cell-even { background: #e65100; box-shadow: none; }
+        body.hard-bg .cell-odd { background: #bf360c; box-shadow: none; }
+        body.hard-bg .tile.empty { background: #5A2D00; }
+        body.hard-bg .tile.letter:not(.selected):not(.row-blaster):not(.eight-way-blaster) { 
+            background: #3e2723; 
+            color: #ffffff; 
+            border-bottom-color: #211512; 
+        }
+
+        /* Super Hard Theme Board Styling (No inner borders, white text on dark tiles) */
+        body.super-hard-bg .cell-even { background: #c62828; box-shadow: none; }
+        body.super-hard-bg .cell-odd { background: #8e0000; box-shadow: none; }
+        body.super-hard-bg .tile.empty { background: #4A0000; }
+        body.super-hard-bg .tile.letter:not(.selected):not(.row-blaster):not(.eight-way-blaster) { 
+            background: #212121; 
+            color: #ffffff; 
+            border-bottom-color: #000000; 
+        }
+
+        .tile { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; cursor: pointer; user-select: none; position: relative; }
+        .tile[data-value="QU"] { font-size: 14px; letter-spacing: -1px; } 
+
+        .tile.empty { background: #1a0033; box-shadow: none; border-radius: 0; cursor: default; }
+        .tile.collection-point { z-index: 10; }
+        .tile.collection-point::after {
+            content: '\2193'; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+            width: 18px; height: 18px; background: #4caf50; color: #fff; border-radius: 50%;
+            font-size: 13px; line-height: 18px; font-weight: 900; text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 -2px 0 rgba(0,0,0,0.2); border: 1.5px solid #2e7d32;
+            z-index: 15; pointer-events: none;
+        }
+        
+        .tile.letter { background: #fafafa; color: #333; border-bottom: 3px solid #ccc; transition: background 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .tile.letter.selected { background: #ffd54f; border-bottom: 3px solid #ffb300; transform: scale(0.90); }
+        
+        .tile.letter.row-blaster { background: #6a1b9a !important; color: #fff176 !important; border-bottom: 3px solid #4a148c !important; box-shadow: 0 0 12px #e040fb, inset 0 0 0 2px rgba(255,241,118,0.35); }
+        .tile.letter.row-blaster::before { content: ""; position: absolute; inset: 0; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><g fill='none' stroke='%23fff176' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' filter='drop-shadow(0 0 1.5px %23000)'><path d='M20 8 V2 M16.5 5.5 L20 2 L23.5 5.5'/><path d='M20 32 V38 M16.5 34.5 L20 38 L23.5 34.5'/><path d='M8 20 H2 M5.5 16.5 L2 20 L5.5 23.5'/><path d='M32 20 H38 M34.5 16.5 L38 20 L34.5 23.5'/></g></svg>"); background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; z-index: 2; }
+        .tile.letter.eight-way-blaster { background: #4a148c !important; color: #fff176 !important; border-bottom: 3px solid #311b92 !important; box-shadow: 0 0 16px #e040fb, 0 0 6px #fff59d, inset 0 0 0 2px rgba(255,241,118,0.45); }
+        .tile.letter.eight-way-blaster::before { content: ""; position: absolute; inset: 0; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><g fill='none' stroke='%23fff176' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' filter='drop-shadow(0 0 1.5px %23000)'><path d='M20 8 V2 M16.8 5.2 L20 2 L23.2 5.2'/><path d='M20 32 V38 M16.8 34.8 L20 38 L23.2 34.8'/><path d='M8 20 H2 M5.2 16.8 L2 20 L5.2 23.2'/><path d='M32 20 H38 M34.8 16.8 L38 20 L34.8 23.2'/><path d='M11 11 L6 6 M6 10 L6 6 L10 6'/><path d='M29 11 L34 6 M30 6 L34 6 L34 10'/><path d='M11 29 L6 34 M6 30 L6 34 L10 34'/><path d='M29 29 L34 34 M30 34 L34 34 L34 30'/></g></svg>"); background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; z-index: 2; }
+
+        .tile.star { 
+            background: transparent !important; border: none !important; box-shadow: none !important; 
+            font-size: 32px; color: #ffeb3b; text-shadow: 0 0 10px #f57f17, 0 0 25px #ff9800; 
+            animation: starPulse 1.5s infinite alternate; pointer-events: none;
+        }
+        @keyframes starPulse {
+            0% { transform: scale(0.8) rotate(-5deg); filter: brightness(1); }
+            100% { transform: scale(1.1) rotate(5deg); filter: brightness(1.2); }
+        }
+
+        .tile.blocker {
+            color: #fff; font-size: 12px; font-weight: 900; text-shadow: 1px 1px 2px #000;
+            box-sizing: border-box; cursor: default; display: flex; align-items: center; justify-content: center;
+            isolation: isolate; background: transparent !important; box-shadow: none !important;        
+        }
+        .tile.blocker::before { content: ""; position: absolute; inset: 0; z-index: -1; box-sizing: border-box; border-radius: inherit; }
+        .tile.blocker[data-hp="1"]::before { background: radial-gradient(circle at 30% 30%, #efebe9, #a1887f 70%, #6d4c41); clip-path: polygon(18% 8%, 60% 0, 88% 12%, 100% 45%, 92% 82%, 65% 100%, 25% 92%, 0 60%, 6% 25%); box-shadow: inset -4px -4px 6px rgba(0,0,0,0.5); }
+        .tile.blocker[data-hp="1"] { color: #3e2723; text-shadow: none; }
+        .tile.blocker[data-hp="2"]::before { background: radial-gradient(circle at 35% 30%, #d7ccc8, #8d6e63 65%, #4e342e); clip-path: polygon(10% 4%, 90% 0, 100% 30%, 96% 92%, 70% 100%, 12% 96%, 0 55%); box-shadow: inset -3px -3px 6px rgba(0,0,0,0.55); border-radius: 4px; }
+        .tile.blocker[data-hp="3"]::before { background: radial-gradient(circle at 35% 30%, #a1887f, #5d4037 70%, #3e2723); clip-path: polygon(5% 3%, 95% 0, 100% 92%, 90% 100%, 5% 96%, 0 25%); box-shadow: inset -3px -3px 5px rgba(0,0,0,0.6); border-radius: 6px; }
+        .tile.blocker[data-hp="4"]::before { background: radial-gradient(circle at 35% 30%, #9e9e9e, #424242 75%, #212121); border: 2px solid #212121; border-radius: 6px; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.75), inset 2px 2px 3px rgba(255,255,255,0.18); }
+        .tile.blocker[data-hp="5"]::before { background: radial-gradient(circle at 35% 30%, #546e7a, #263238 75%, #000); border: 3px solid #000; border-radius: 5px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.9), inset 2px 2px 3px rgba(255,255,255,0.2); }
+        .tile.blocker[data-hp="6"]::before { background: linear-gradient(135deg, #212121, #000 70%); border: 3px solid #000; border-radius: 4px; box-shadow: inset -2px -2px 8px rgba(0,0,0,1), inset 3px 3px 4px rgba(255,255,255,0.28), 0 0 8px rgba(170,0,255,0.55); }
+        .tile.blocker[data-hp="6"] { color: #ea80fc; }
+        .tile.blocker[data-hp="7"]::before, .tile.blocker[data-hp="8"]::before, .tile.blocker[data-hp="9"]::before { background: #000; border: 3px solid #000; border-radius: 4px; box-shadow: inset 0 0 12px #aa00ff, inset 0 0 0 2px rgba(255,255,255,0.25); }
+        .tile.blocker[data-hp="7"], .tile.blocker[data-hp="8"], .tile.blocker[data-hp="9"] { color: #ea80fc; }
+
+        .moon { position: absolute; top: -4px; right: -4px; font-size: 14px; filter: hue-rotate(170deg) drop-shadow(0px 0px 4px #00e5ff); z-index: 10; }
+        .tile.letter.locked { box-shadow: 0 2px 4px rgba(0,0,0,0.3), inset 0 0 0 3px #616161, inset 0 0 0 5px #212121; }
+        .chain-overlay { position: absolute; inset: -3px; border: 3px dashed #424242; border-radius: 8px; pointer-events: none; box-shadow: inset 0 0 4px rgba(0,0,0,0.6), 0 0 3px rgba(0,0,0,0.5); z-index: 5; }
+        .chain-overlay::before { content: "🔗"; position: absolute; top: -8px; left: -8px; font-size: 12px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.7)); }
+
+        /* Enhanced Removal Animations */
+        @keyframes popOut { 
+            0% { transform: scale(1) rotate(0deg); opacity: 1; } 
+            50% { transform: scale(1.3) rotate(10deg); opacity: 0.8; } 
+            100% { transform: scale(0) rotate(-10deg); opacity: 0; } 
+        }
+        .tile.removed { animation: popOut 0.3s forwards ease-in-out; pointer-events: none; }
+
+        @keyframes explodeBlast { 
+            0% { background-color: inherit; transform: scale(1); box-shadow: 0 0 10px #e040fb; opacity: 1; } 
+            40% { background-color: #e040fb; transform: scale(1.3) rotate(20deg); filter: brightness(1.5); opacity: 0.9; box-shadow: 0 0 30px #e040fb; } 
+            100% { transform: scale(0) rotate(45deg); opacity: 0; box-shadow: 0 0 0 transparent; } 
+        }
+        .tile.removed-blasted { animation: explodeBlast 0.4s forwards ease-out; pointer-events: none; }
+
+        @keyframes moonVaporize { 
+            0% { transform: scale(1); filter: brightness(1); opacity: 1; } 
+            40% { transform: scale(1.2) translateY(-5px); filter: brightness(1.8) hue-rotate(90deg); opacity: 0.9; box-shadow: 0 0 20px #00e5ff; } 
+            100% { transform: scale(0) translateY(-20px); opacity: 0; box-shadow: 0 0 0 transparent; } 
+        }
+        .tile.removed-moon { animation: moonVaporize 0.4s forwards ease-in; pointer-events: none; }
+
+        @keyframes moonStrike { 
+            0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); transform: scale(1) translateY(-30px); opacity: 0; background-color: #fff; } 
+            30% { transform: scale(1.1) translateY(0); opacity: 1; } 
+            50% { box-shadow: 0 0 30px 15px rgba(0, 229, 255, 0.6); transform: scale(1.2); background-color: #b2ebf2; } 
+            100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); transform: scale(1); background-color: inherit; } 
+        }
+        .tile.struck { animation: moonStrike 0.45s ease-out; z-index: 20; position: relative; }
+
+        .action-area { display: flex; width: 100%; margin-top: 15px; align-items: center; justify-content: space-between; }
+        .text-area { display: flex; flex-direction: column; flex-grow: 1; }
+        #current-word { height: 30px; font-size: 24px; letter-spacing: 4px; font-weight: bold; color: #ffd54f; display: flex; align-items: center; }
+        #message { height: 20px; font-size: 14px; font-weight: bold; margin-top: 5px; transition: color 0.2s ease; }
+        #submit-btn { width: 140px; padding: 15px 10px; font-size: 16px; margin: 0; flex-shrink: 0; }
+        #submit-btn:disabled { background: #555; color: #888; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        /* Rules Screen */
+        .rules-content { width: 100%; display: flex; flex-direction: column; gap: 14px; padding-bottom: 40px; }
+        .rule-card {
+            display: flex; gap: 16px; align-items: center;
+            background: linear-gradient(180deg, rgba(123,31,162,0.55), rgba(74,20,140,0.65));
+            border: 2px solid rgba(255,255,255,0.15);
+            border-radius: 14px; padding: 14px;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .rule-demo { flex-shrink: 0; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; }
+        .rule-demo .tile { width: 56px; height: 56px; font-size: 22px; cursor: default; }
+        .rule-text h3 { margin: 0 0 4px 0; color: #ffd54f; font-size: 1.05rem; }
+        .rule-text p { margin: 0; font-size: 0.92rem; line-height: 1.35; color: #e3f2fd; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen" class="screen">
+        <h1 style="color: #ffd54f; text-shadow: 0 4px 10px rgba(0,0,0,0.5);">WordFall</h1>
+        <input type="email" id="login-email" placeholder="Email Address">
+        <input type="password" id="login-password" placeholder="Password">
+        <div id="login-error" class="error-text"></div>
+        <button id="login-btn" class="btn">Log In</button>
+        <button id="go-signup-btn" class="btn secondary">Create an Account</button>
+    </div>
+
+    <div id="signup-screen" class="screen">
+        <h1 style="color: #ffd54f; text-shadow: 0 4px 10px rgba(0,0,0,0.5);">Sign Up</h1>
+        <input type="text" id="signup-username" placeholder="Username">
+        <input type="text" id="signup-full-name" placeholder="Full Name">
+        <input type="email" id="signup-email" placeholder="Email Address">
+        <input type="password" id="signup-password" placeholder="Password">
+        <div id="signup-error" class="error-text"></div>
+        <button id="signup-btn" class="btn">Sign Up</button>
+        <button id="go-login-btn" class="btn secondary">Back to Log In</button>
+    </div>
+
+    <div id="map-screen" class="screen">
+        <div class="map-header">
+            <h2>Select Level</h2>
+            <h2 id="username-display" style="margin: 0; font-size: 1.2rem; color: #ffd54f;"></h2>
+            <div style="display:flex; gap:8px;">
+                <button id="rules-btn" class="btn secondary" style="width: auto; margin:0; padding: 8px 15px;">Rules</button>
+                <button id="logout-btn" class="btn danger" style="width: auto; margin:0; padding: 8px 15px;">Logout</button>
+            </div>
+        </div>
+        <div class="map-wrapper" id="map-wrapper">
+            <div id="map-container" class="map-container"></div>
+        </div>
+    </div>
+
+    <div id="rules-screen" class="screen" style="max-width: 560px;">
+        <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h2 style="margin:0; color:#ffd54f; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">How to Play</h2>
+            <button id="rules-back-btn" class="btn secondary" style="width:auto; margin:0; padding:8px 15px;">&larr; Map</button>
+        </div>
+        <div id="rules-content" class="rules-content"></div>
+    </div>
+
+    <div id="game-screen" class="screen" style="max-width: 440px;">
+        <div style="width: 100%; display: flex; justify-content: flex-start; margin-bottom: 10px;">
+            <button id="back-to-map-btn" class="btn secondary" style="width: auto; padding: 8px 15px;">&larr; Map</button>
+        </div>
+        
+        <div class="candy-header">
+            <div class="stats">Moves: <span id="moves-left" style="color: #ffeb3b;">-</span></div>
+            <div class="title-box" id="level-name">Level</div>
+            <div class="stats">Stars: <span id="stars-ui" style="color: #64b5f6;">0 / 0</span></div>
+        </div>
+        
+        <div id="level-complete-banner" class="banner-overlay">LEVEL COMPLETE!</div>
+
+        <div id="game-board"></div>
+        
+        <div class="action-area">
+            <div class="text-area">
+                <div id="current-word"></div>
+                <div id="message"></div>
+            </div>
+            <button id="submit-btn" class="btn" disabled>PLAY WORD</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+        const SUPABASE_URL = 'https://cmdnzxnlcvtkenkzvgke.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZG56eG5sY3Z0a2Vua3p2Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMzg5ODgsImV4cCI6MjA5ODcxNDk4OH0.7mFyIrVf1gLlrtVWcSFlj7WU8_zCbQ1Pg4Hguctor0M';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let allLevels = [];
+        let unlockedIndex = 0; 
+        
+        let currentLevelIndex = 0;
+        let gameState = [];
+        let selectedTiles = [];
+        let movesLeft = 0;
+        let starsCollected = 0;
+        let totalStars = 0;
+        let gameOver = false;
+        
+        // Added queue for sequential moon chaining
+        let pendingMoonsQueue = 0;
+        let validScrabbleWords = new Set(); // Stores our loaded SOWPODS dictionary
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        const ALPHABET = "AAAAAAAAABBCCDDDDEEEEEEEEEEEEFFGGGHHIIIIIIIIIJKLLLLMMNNNNNNOOOOOOOOPPQRRRRRRSSSSTTTTTTUUUUVVWWXYYZ";
+        const getRandomLetter = () => {
+            let letter = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+            return letter === 'Q' ? 'QU' : letter; 
+        };
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadDictionary(); // Load the word list when the app initializes
+            document.getElementById('login-btn').addEventListener('click', doLogin);
+            document.getElementById('signup-btn').addEventListener('click', doSignup);
+            document.getElementById('go-signup-btn').addEventListener('click', () => showScreen('signup-screen'));
+            document.getElementById('go-login-btn').addEventListener('click', () => showScreen('login-screen'));
+            document.getElementById('logout-btn').addEventListener('click', async () => { await supabase.auth.signOut(); currentUser = null; showScreen('login-screen'); });
+            document.getElementById('rules-btn').addEventListener('click', () => { renderRules(); showScreen('rules-screen'); });
+            document.getElementById('rules-back-btn').addEventListener('click', () => showScreen('map-screen'));
+            document.getElementById('back-to-map-btn').addEventListener('click', () => { showScreen('map-screen'); document.body.className = ''; renderMap(); });
+            document.getElementById('submit-btn').addEventListener('click', () => { if (gameOver) { showScreen('map-screen'); document.body.className = ''; renderMap(); } else processTurn(); });
+        });
+
+        // Initialize SOWPODS Dictionary
+        async function loadDictionary() {
+            try {
+                const res = await fetch('https://raw.githubusercontent.com/jesstess/Scrabble/master/scrabble/sowpods.txt');
+                const text = await res.text();
+                const words = text.split(/\r?\n/);
+                for(let w of words) {
+                    if(w.trim().length > 0) validScrabbleWords.add(w.trim().toUpperCase());
+                }
+            } catch (e) {
+                console.warn("Dictionary load failed, will fall back to API on submit.", e);
+            }
+        }
+
+        // Lock removed animations so they don't pop back in when the board rerenders
+        function markRemovedAsDone() {
+            for(let y=0; y<10; y++) {
+                for(let x=0; x<10; x++) {
+                    if (gameState[y][x] && gameState[y][x].type === 'removed') {
+                        gameState[y][x].animDone = true;
+                    }
+                }
+            }
+        }
+
+        async function checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) { currentUser = session.user; await loadMapData(); showScreen('map-screen'); } 
+            else showScreen('login-screen');
+        }
+        
+        async function doLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) { errEl.textContent = error.message; return; }
+            errEl.textContent = "";
+            currentUser = data.user;
+            await loadMapData();
+            showScreen('map-screen');
+        }
+
+        async function doSignup() {
+            const username = document.getElementById('signup-username').value.trim();
+            const fullName = document.getElementById('signup-full-name').value.trim();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const errEl = document.getElementById('signup-error');
+            if (!username || !email || !password) { errEl.textContent = "Please fill in username, email, and password."; return; }
+            const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { username, full_name: fullName } } });
+            if (error) { errEl.textContent = error.message; return; }
+            errEl.textContent = "";
+            currentUser = data.user;
+            await loadMapData();
+            showScreen('map-screen');
+        }
+
+        function renderRules() {
+            const rules = [
+                { demoHTML: `<div class="tile letter" data-value="A">A</div>`,
+                  title: '1. Letter Tiles & Word Formation',
+                  desc: 'The core gameplay revolves around spelling valid dictionary words. You can tap any adjacent letters—vertically, horizontally, or diagonally—to string together a word. Each word must be at least 3 letters long. Once you have formed a valid sequence, hit the "PLAY WORD" button. If the word exists in the comprehensive English dictionary API, the tiles are destroyed, and gravity will pull the remaining tiles down to fill the gaps. New randomized letters will fall from the top of the board to replace them, keeping the grid completely full at all times.' },
+                { demoHTML: `<div class="tile letter selected" data-value="B">B</div>`,
+                  title: '2. Selection Mechanics',
+                  desc: 'As you tap tiles, they will turn yellow and shrink slightly to indicate they are currently selected. Your current word-in-progress is displayed at the bottom of the screen. You can trace forwards, but if you make a mistake, simply tap the very last selected yellow tile to deselect it. You can do this repeatedly to completely undo your current selection without spending a move. Planning your path carefully is key, as you want to form longer words to unlock powerful special tiles.' },
+                { demoHTML: `<div class="tile letter locked" data-value="L">L</div>`,
+                  title: '3. Chained / Locked Letters',
+                  desc: 'Tiles wrapped in dark iron chains are "Locked." These are stationary hazards that cannot be selected as part of any word. They block your path and prevent tiles above them from falling down. To break the chains and free the letter inside, you must successfully play a valid word using at least one tile that is immediately adjacent (touching horizontally, vertically, or diagonally) to the locked tile. Once the adjacent word is played, the chains shatter, turning it back into a normal, playable letter on your next turn.' },
+                { demoHTML: `<div class="tile letter row-blaster" data-value="R">R</div>`,
+                  title: '4. The 4-Way Line Blaster',
+                  desc: 'Creating longer words rewards you with explosive capabilities! If you form and play a word consisting of exactly 7 letters, the final letter you selected to complete that word will instantly transform into a glowing 4-Way Blaster rather than disappearing. When you subsequently use this newly created Blaster in a future word, it detonates! The explosion shoots beams vertically and horizontally, instantly destroying every single tile in its entire row and column, dealing massive damage to obstacles and clearing out junk.' },
+                { demoHTML: `<div class="tile letter eight-way-blaster" data-value="E">E</div>`,
+                  title: '5. The 8-Way Starburst Blaster',
+                  desc: 'For the ultimate tactical advantage, spell a word that is 8 or more letters long. The final tile of that massive word will convert into a dark-purple 8-Way Blaster. This is the most powerful tile in the game. When successfully used in a valid word, it erupts in all 8 directions—destroying its entire row, its entire column, and both full diagonals intersecting it. This massive board-wipe effect is essential for heavily obstructed late-game levels and dealing devastating blows to high-HP blockers.' },
+                { demoHTML: `<div class="tile star">★</div>`,
+                  title: '6. Objective: Star Collection',
+                  desc: 'To complete a level, you must collect a specific number of golden Stars shown in the top right corner. Stars are unaffected by words and cannot be selected. To collect them, you must destroy the tiles underneath them, allowing gravity to pull the Stars downwards. A Star is only collected when it falls off the very bottom of the grid, or into designated "collection points" (marked by green downward arrows). If you run out of moves before guiding all required Stars to the bottom, you fail the level.' },
+                { demoHTML: `<div class="tile blocker" data-hp="3">3</div>`,
+                  title: '7. Stone Blockers & HP Damage',
+                  desc: 'Blockers are heavy, immovable obstacles that do not fall with gravity and cannot be part of a word. They have a visible number on them representing their Health Points (HP). Every time you play a word adjacent to a Blocker, it takes 1 point of damage and the number decreases. When a Blocker reaches 0 HP, it crumbles and is removed from the board, freeing up space. Stronger Blockers (like 5+ HP) have different visual textures (darker stone, glowing purple borders) and take significant effort or Blaster explosions to destroy.' },
+                { demoHTML: `<div class="tile empty" style="background:#3a1a6b; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);"></div>`,
+                  title: '8. Move Economy & Lunar Moons',
+                  desc: 'Every word you submit costs exactly 1 Move from your total limit, regardless of the word\'s length. If the move counter at the top left hits zero before all Stars are collected, the game is over. To assist you, playing a word of 5 or 6 letters summons Moon icons (🌙) onto random unselected tiles. When a tile with a Moon is used in a word, the Moon activates and automatically strikes a random Blocker or a tile blocking a Star, dealing 1 damage to it from anywhere on the board! Chain Moons together for maximum efficiency.' },
+            ];
+            const html = rules.map(r => `
+                <div class="rule-card">
+                    <div class="rule-demo">${r.demoHTML}</div>
+                    <div class="rule-text"><h3>${r.title}</h3><p>${r.desc}</p></div>
+                </div>`).join('');
+            document.getElementById('rules-content').innerHTML = html;
+        }
+
+        async function loadMapData() {
+            const { data: levels } = await supabase.from('levels').select('*').order('sort_order', { ascending: true });
+            allLevels = levels || [];
+            const { data: profile } = await supabase.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
+            const uname = profile?.username || currentUser.user_metadata?.username || currentUser.email?.split('@')[0] || 'Player';
+            document.getElementById('username-display').textContent = `👤 ${uname}`;
+            const { data: progress } = await supabase.from('user_progress').select('unlocked_index').eq('user_id', currentUser.id).single();
+            if (progress) unlockedIndex = progress.unlocked_index;
+            else { await supabase.from('user_progress').insert([{ user_id: currentUser.id, unlocked_index: 0 }]); unlockedIndex = 0; }
+            renderMap();
+        }
+
+        function renderMap() {
+            const container = document.getElementById('map-container');
+            container.innerHTML = "";
+            let latestUnlockedBtn = null;
+
+            const total = allLevels.length;
+            const SLOT_H = 92;
+            const AMPLITUDE = 110;
+            const containerHeight = total * SLOT_H;
+
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('class', 'map-path');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            svg.setAttribute('viewBox', `0 0 100 ${containerHeight}`);
+
+            const pts = [];
+            for (let i = 0; i < total; i++) {
+                const y = containerHeight - (SLOT_H / 2) - i * SLOT_H;
+                const offsetPct = (Math.sin(i * 0.9) * AMPLITUDE) / 5; 
+                const x = 50 + offsetPct;
+                pts.push({ x, y, offsetPx: Math.sin(i * 0.9) * AMPLITUDE });
+            }
+
+            if (pts.length > 1) {
+                let d = `M ${pts[0].x} ${pts[0].y}`;
+                for (let i = 1; i < pts.length; i++) {
+                    const prev = pts[i - 1];
+                    const cur = pts[i];
+                    const midY = (prev.y + cur.y) / 2;
+                    d += ` C ${prev.x} ${midY}, ${cur.x} ${midY}, ${cur.x} ${cur.y}`;
+                }
+                const trail = document.createElementNS(svgNS, 'path');
+                trail.setAttribute('d', d);
+                trail.setAttribute('class', 'trail');
+                svg.appendChild(trail);
+                const dashes = document.createElementNS(svgNS, 'path');
+                dashes.setAttribute('d', d);
+                dashes.setAttribute('class', 'dashes');
+                svg.appendChild(dashes);
+            }
+            container.appendChild(svg);
+            container.style.height = containerHeight + 'px';
+
+            allLevels.forEach((level, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'level-slot';
+
+                const inner = document.createElement('div');
+                inner.className = 'slot-inner';
+                inner.style.transform = `translateX(${pts[index].offsetPx}px)`;
+
+                const btn = document.createElement('button');
+                btn.className = 'level-btn';
+
+                if (level.difficulty === 'hard') btn.classList.add('hard');
+                if (level.difficulty === 'super_hard') btn.classList.add('super-hard');
+
+                btn.textContent = index > unlockedIndex ? "🔒" : index + 1;
+                btn.disabled = index > unlockedIndex;
+
+                if (index === unlockedIndex) {
+                    btn.classList.add('current');
+                    latestUnlockedBtn = btn;
+                }
+
+                if (!btn.disabled) btn.addEventListener('click', () => startGame(index));
+
+                inner.appendChild(btn);
+                slot.appendChild(inner);
+                container.prepend(slot);
+            });
+
+            setTimeout(() => {
+                if (latestUnlockedBtn) {
+                    latestUnlockedBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    const wrapper = document.getElementById('map-wrapper');
+                    wrapper.scrollTop = wrapper.scrollHeight;
+                }
+            }, 100);
+        }
+
+        function startGame(index) {
+            currentLevelIndex = index;
+            const level = allLevels[index];
+            window.scrollTo({ top: 0, behavior: 'smooth' }); 
+            
+            movesLeft = parseInt(level.target_moves) || 15;
+            selectedTiles = [];
+            starsCollected = 0;
+            totalStars = 0;
+            gameOver = false;
+            pendingMoonsQueue = 0;
+            
+            document.getElementById('message').textContent = "";
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.textContent = 'PLAY WORD';
+            submitBtn.disabled = true;
+
+            const header = document.querySelector('.candy-header');
+            header.classList.remove('hard', 'super-hard');
+            document.body.className = '';
+            const board = document.getElementById('game-board');
+            board.style.background = '#1a0033';
+            
+            if (level.difficulty === 'hard') {
+                header.classList.add('hard');
+                document.body.classList.add('hard-bg');
+                board.style.background = '#5A2D00';
+            } else if (level.difficulty === 'super_hard') {
+                header.classList.add('super-hard');
+                document.body.classList.add('super-hard-bg');
+                board.style.background = '#4A0000';
+            }
+            
+            document.getElementById('level-name').innerHTML = `${level.name}`;
+
+            gameState = level.grid_data.map((row, y) => 
+                row.map((cell, x) => {
+                    let tile = { ...cell, x, y, moons: 0, isStruck: false, blasterType: null, removalReason: null }; 
+                    if (tile.type === 'random_letter') { tile.type = 'letter'; tile.value = getRandomLetter(); }
+                    if (tile.type === 'specific_letter') { tile.type = 'letter'; if (tile.value === 'Q') tile.value = 'QU'; }
+                    if (tile.type === 'locked_letter' || tile.type === 'random_locked_letter') {
+                        tile.type = 'letter';
+                        tile.locked = true;
+                        if (tile.type === 'random_locked_letter' || !tile.value) tile.value = getRandomLetter();
+                        else if (tile.value === 'Q') tile.value = 'QU';
+                    }
+                    if (tile.type === 'star') totalStars++;
+                    return tile;
+                })
+            );
+
+            updateTopUI();
+            renderBoard();
+            showScreen('game-screen');
+        }
+
+        function renderBoard() {
+            const boardElement = document.getElementById('game-board');
+            boardElement.innerHTML = '';
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                    const tile = gameState[y][x];
+                    const div = document.createElement('div');
+                    
+                    const isEven = (x + y) % 2 === 0;
+                    div.className = `tile ${isEven ? 'cell-even' : 'cell-odd'} ${tile.type}`;
+
+                    const belowEmpty = y === 9 || (gameState[y + 1] && gameState[y + 1][x].type === 'empty');
+                    if (belowEmpty && tile.type !== 'empty') {
+                        div.classList.add('collection-point');
+                    }
+                    
+                    if (tile.isStruck) div.classList.add('struck'); 
+
+                    // Dynamic animations based on destruction cause
+                    if (tile.type === 'removed') {
+                        if (tile.animDone) {
+                            div.style.opacity = '0';
+                            div.style.transform = 'scale(0)';
+                            div.style.pointerEvents = 'none';
+                            div.style.animation = 'none'; // Overrides the popOut from .removed
+                        } else if (tile.removalReason === 'blasted') {
+                            div.classList.add('removed-blasted');
+                        } else if (tile.removalReason === 'moon') {
+                            div.classList.add('removed-moon');
+                        } else if (tile.removalReason === 'word') {
+                            div.classList.add('removed');
+                        }
+                    }
+
+                    if (tile.value) div.setAttribute('data-value', tile.value);
+                    
+                    if (tile.type === 'letter') {
+                        div.textContent = tile.value;
+                        
+                        if (tile.blasterType === 'row') div.classList.add('row-blaster');
+                        if (tile.blasterType === 'eightway') div.classList.add('eight-way-blaster');
+
+                        if (tile.locked) {
+                            div.classList.add('locked');
+                            const chain = document.createElement('div');
+                            chain.className = 'chain-overlay';
+                            div.appendChild(chain);
+                        }
+                    } else if (tile.type === 'blocker') {
+                        div.textContent = tile.value; div.setAttribute('data-hp', tile.value); 
+                    } else if (tile.type === 'star') { div.textContent = '★'; }
+
+                    if (tile.moons > 0 && tile.type === 'letter' && tile.type !== 'removed') {
+                        const moonIcon = document.createElement('div');
+                        moonIcon.className = 'moon';
+                        moonIcon.textContent = '🌙'; div.appendChild(moonIcon);
+                    }
+
+                    if (selectedTiles.some(t => t.x === x && t.y === y)) div.classList.add('selected');
+                    if (tile.type === 'letter' && !gameOver) div.addEventListener('click', () => toggleTileSelection(tile, x, y));
+
+                    boardElement.appendChild(div);
+                }
+            }
+        }
+
+        function toggleTileSelection(tile, x, y) {
+            document.getElementById('message').textContent = ""; 
+            const existingIndex = selectedTiles.findIndex(t => t.x === x && t.y === y);
+            
+            if (existingIndex !== -1) {
+                if (existingIndex === selectedTiles.length - 1) selectedTiles.pop();
+            } else {
+                if (selectedTiles.length > 0) {
+                    const last = selectedTiles[selectedTiles.length - 1];
+                    const dx = Math.abs(last.x - x), dy = Math.abs(last.y - y);
+                    if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) return; 
+                }
+                selectedTiles.push({ ...tile, x, y });
+            }
+
+            renderBoard();
+            const word = selectedTiles.map(t => t.value).join('');
+            document.getElementById('current-word').textContent = word;
+            
+            if (gameOver) document.getElementById('submit-btn').disabled = false;
+            else document.getElementById('submit-btn').disabled = word.length < 3;
+        }
+
+        function updateTopUI() {
+            document.getElementById('moves-left').textContent = movesLeft;
+            document.getElementById('stars-ui').textContent = `${starsCollected} / ${totalStars}`;
+        }
+
+        async function triggerMoonEffect() {
+            let blockers = []; let underStars = [];
+            for(let y=0; y<10; y++) {
+                for(let x=0; x<10; x++) {
+                    const tile = gameState[y][x];
+                    
+                    if (tile.type === 'removed') continue;
+                    if (selectedTiles.some(t => t.x === x && t.y === y)) continue;
+
+                    if (tile.type === 'blocker') blockers.push(tile);
+                    if (tile.type === 'star') {
+                        const below = y + 1 < 10 ? gameState[y + 1][x] : null;
+                        if (below && below.type !== 'removed' && !selectedTiles.some(t => t.x === below.x && t.y === below.y)) {
+                            if (below.type === 'letter' || below.type === 'blocker') underStars.push(below);
+                        }
+                    }
+                }
+            }
+
+            let target = null;
+            if (underStars.length > 0) target = underStars[Math.floor(Math.random() * underStars.length)];
+            else if (blockers.length > 0) target = blockers[Math.floor(Math.random() * blockers.length)];
+
+            if (target) {
+                target.isStruck = true; 
+                renderBoard(); 
+                await sleep(450); // Pause so the strike animation can be clearly seen
+                target.isStruck = false;
+                
+                if (target.type === 'blocker') {
+                    target.value--; 
+                    if (target.value <= 0) {
+                        target.type = 'removed';
+                        target.removalReason = 'moon';
+                    }
+                } else if (target.type === 'letter') {
+                    if (target.locked) { 
+                        target.locked = false; 
+                    } else {
+                        // Crucial Chain Reaction logic!
+                        if (target.moons > 0) {
+                            pendingMoonsQueue += target.moons;
+                            target.moons = 0;
+                        }
+                        target.type = 'removed';
+                        target.removalReason = 'moon';
+                    }
+                }
+                renderBoard();
+                await sleep(350); // Let the moon destruction animation finish
+                markRemovedAsDone();
+            }
+        }
+
+        async function triggerBlasterExplosion(centerX, centerY, mode) {
+            let targets = [];
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                    let dx = Math.abs(x - centerX), dy = Math.abs(y - centerY);
+                    let match = false;
+                    if (mode === 'row') { if (x === centerX || y === centerY) match = true; }
+                    else if (mode === 'eightway') { if (x === centerX || y === centerY || dx === dy) match = true; }
+                    if (match && !(x === centerX && y === centerY)) targets.push(gameState[y][x]);
+                }
+            }
+
+            targets.forEach(cell => {
+                if (cell.type === 'letter' && cell.type !== 'removed') { 
+                    if (cell.locked) {
+                        cell.locked = false; 
+                    } else { 
+                        // Blasters also contribute to the moon queue if they hit moons
+                        if (cell.moons > 0) {
+                            pendingMoonsQueue += cell.moons;
+                            cell.moons = 0;
+                        }
+                        cell.type = 'removed';
+                        cell.removalReason = 'blasted';
+                    } 
+                }
+                else if (cell.type === 'blocker') { 
+                    cell.value--; 
+                    if (cell.value <= 0) {
+                        cell.type = 'removed';
+                        cell.removalReason = 'blasted';
+                    } 
+                }
+            });
+            renderBoard();
+            await sleep(250);
+            markRemovedAsDone();
+        }
+
+        async function applyGravityAndStars() {
+            let settling = true;
+            let changesMade = false;
+            while(settling) {
+                for (let x = 0; x < 10; x++) {
+                    for (let y = 9; y >= 0; y--) {
+                        if (gameState[y][x].type === 'removed') {
+                            let foundTile = false;
+                            for (let lookY = y - 1; lookY >= 0; lookY--) {
+                                let lookTile = gameState[lookY][x];
+                                if (lookTile.type === 'blocker' || lookTile.type === 'empty') break;
+                                if (lookTile.type === 'letter' || lookTile.type === 'star') {
+                                    gameState[y][x] = { ...lookTile, x, y };
+                                    // Make sure new removed slots skip the pop animation
+                                    gameState[lookY][x] = { type: 'removed', removalReason: 'gravity', x, y: lookY, animDone: true };
+                                    foundTile = true; break;
+                                }
+                            }
+                            if (!foundTile) {
+                                gameState[y][x] = { type: 'letter', value: getRandomLetter(), x, y, moons: 0, isStruck: false, blasterType: null, removalReason: null };
+                            }
+                            changesMade = true;
+                        }
+                    }
+                }
+
+                let starsFell = false;
+                for (let y = 0; y < 10; y++) {
+                    for (let x = 0; x < 10; x++) {
+                        if (gameState[y][x].type === 'star') {
+                            const atBottom = y === 9, emptyBelow = !atBottom && gameState[y + 1][x].type === 'empty';
+                            if (atBottom || emptyBelow) { 
+                                gameState[y][x].type = 'removed'; 
+                                gameState[y][x].animDone = true; 
+                                starsCollected++; starsFell = true; changesMade = true; 
+                            }
+                        }
+                    }
+                }
+                if (!starsFell) settling = false;
+            }
+            return changesMade;
+        }
+
+        async function processTurn() {
+            const word = selectedTiles.map(t => t.value).join('');
+            const tileCount = selectedTiles.length;
+            const submitBtn = document.getElementById('submit-btn');
+            const msgDisplay = document.getElementById('message');
+            
+            submitBtn.disabled = true; submitBtn.textContent = 'CHECKING...';
+
+            let isValid = false;
+            // Primary Method: Ultra-fast local SOWPODS Dictionary verification
+            if (validScrabbleWords.size > 0) {
+                isValid = validScrabbleWords.has(word.toUpperCase());
+            } else {
+                // Secondary Method: Fallback to the dictionary API if the list failed to load
+                try {
+                    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+                    isValid = res.ok;
+                } catch (e) {
+                    isValid = false;
+                }
+            }
+
+            if (!isValid) {
+                msgDisplay.textContent = `"${word}" is not valid.`; msgDisplay.style.color = "#ffeb3b";
+                submitBtn.disabled = false; submitBtn.textContent = 'PLAY WORD';
+                selectedTiles = []; renderBoard(); document.getElementById('current-word').textContent = "";
+                return;
+            }
+
+            movesLeft--; updateTopUI();
+            pendingMoonsQueue = 0; // Fresh queue for the new turn
+
+            // 1. Gather all base Moons from the selected word
+            selectedTiles.forEach(t => { 
+                const cell = gameState[t.y][t.x];
+                if (cell.moons > 0) {
+                    pendingMoonsQueue += cell.moons;
+                    cell.moons = 0; // Cleared so it's not double-counted
+                } 
+            });
+
+            // 2. Detonate any blasters selected (might add even MORE moons)
+            for (let t of selectedTiles) {
+                const boardCell = gameState[t.y][t.x];
+                if (boardCell.blasterType === 'row' || boardCell.blasterType === 'eightway') {
+                    await triggerBlasterExplosion(t.x, t.y, boardCell.blasterType);
+                }
+            }
+
+            // 3. Apply basic orthogonal damage to blockers
+            const damaged = new Set();
+            const orthogonalDirections = [[0, 1], [0, -1], [1, 0], [-1, 0]]; 
+            
+            selectedTiles.forEach(tile => {
+                orthogonalDirections.forEach(([dx, dy]) => {
+                    let nx = tile.x + dx, ny = tile.y + dy;
+                    if (nx >= 0 && nx < 10 && ny >= 0 && ny < 10) {
+                        let neighbor = gameState[ny][nx];
+                        if (neighbor.type === 'blocker' && !damaged.has(`${nx},${ny}`)) {
+                            neighbor.value--; damaged.add(`${nx},${ny}`);
+                            if (neighbor.value <= 0) {
+                                neighbor.type = 'removed';
+                                neighbor.removalReason = 'word';
+                            }
+                        }
+                    }
+                });
+            });
+
+            // 4. Remove all successfully selected tiles
+            const lastTilePlayed = selectedTiles[selectedTiles.length - 1];
+
+            selectedTiles.forEach(t => {
+                const cell = gameState[t.y][t.x];
+                if (tileCount >= 7 && t.x === lastTilePlayed.x && t.y === lastTilePlayed.y) {
+                    cell.locked = false; cell.moons = 0;
+                    if (tileCount === 7) cell.blasterType = 'row';
+                    else if (tileCount >= 8) cell.blasterType = 'eightway';
+                } else {
+                    if (cell.locked) { 
+                        cell.locked = false; 
+                    } else if (cell.type !== 'removed') { 
+                        cell.type = 'removed';
+                        cell.removalReason = 'word';
+                    }
+                }
+            });
+
+            selectedTiles = []; 
+            renderBoard(); 
+            await sleep(350); // Pause for removal animations to complete
+            markRemovedAsDone(); // PREVENT THE TILES FROM FLASHING LATER
+
+            // 5. Fire all Moons entirely sequentially!
+            while (pendingMoonsQueue > 0) {
+                pendingMoonsQueue--;
+                msgDisplay.textContent = `🌙 Moon activated! (${pendingMoonsQueue > 0 ? pendingMoonsQueue + ' left' : 'Last one!'})`; 
+                msgDisplay.style.color = "#4fc3f7";
+                await triggerMoonEffect();
+                await sleep(150); // Slight grace period between moons
+                markRemovedAsDone(); // Prevent this moon's target from flashing on the next loop
+            }
+
+            // 6. Apply gravity and settle the board
+            if (await applyGravityAndStars()) {
+                renderBoard();
+                await sleep(300);
+            }
+
+            // 7. Check if we need to spawn new moons
+            if (tileCount >= 5) {
+                let moonsToSpawn = tileCount - 4, availableTiles = [];
+                for(let y=0; y<10; y++) {
+                    for(let x=0; x<10; x++) {
+                        if (gameState[y][x].type === 'letter' && !gameState[y][x].moons && gameState[y][x].type !== 'removed') availableTiles.push(gameState[y][x]);
+                    }
+                }
+                for (let i = 0; i < moonsToSpawn; i++) {
+                    if (availableTiles.length > 0) {
+                        const idx = Math.floor(Math.random() * availableTiles.length);
+                        const t = availableTiles.splice(idx, 1)[0]; t.moons = (t.moons || 0) + 1;
+                    }
+                }
+            }
+
+            document.getElementById('current-word').textContent = "";
+            submitBtn.textContent = 'PLAY WORD';
+            msgDisplay.textContent = "";
+            updateTopUI(); 
+            renderBoard(); 
+            await handleWinLoss();
+        }
+
+        async function handleWinLoss() {
+            const msgDisplay = document.getElementById('message'), submitBtn = document.getElementById('submit-btn');
+
+            if (starsCollected >= totalStars && totalStars > 0) {
+                gameOver = true; 
+                submitBtn.disabled = true;
+
+                // Level Complete Banner Overlay
+                const banner = document.getElementById('level-complete-banner');
+                banner.className = 'banner-overlay'; 
+                const level = allLevels[currentLevelIndex];
+                if (level.difficulty === 'hard') banner.classList.add('hard');
+                if (level.difficulty === 'super_hard') banner.classList.add('super-hard');
+                
+                banner.style.display = 'flex';
+                await sleep(1500);
+                banner.style.display = 'none';
+
+                // "Sugar Crush" Ending Sequence
+                while (movesLeft > 0) {
+                    movesLeft--;
+                    updateTopUI();
+                    
+                    let available = [];
+                    for(let y=0; y<10; y++) {
+                        for(let x=0; x<10; x++) {
+                            if(gameState[y][x].type === 'letter' && !gameState[y][x].blasterType && gameState[y][x].type !== 'removed' && !gameState[y][x].locked) {
+                                available.push(gameState[y][x]);
+                            }
+                        }
+                    }
+                    if (available.length > 0) {
+                        let target = available[Math.floor(Math.random() * available.length)];
+                        target.blasterType = 'eightway';
+                        renderBoard();
+                        await sleep(250);
+                        
+                        await triggerBlasterExplosion(target.x, target.y, 'eightway');
+                        target.type = 'removed';
+                        target.removalReason = 'blasted';
+                        renderBoard();
+                        await sleep(250);
+                        markRemovedAsDone();
+                        
+                        if (await applyGravityAndStars()) {
+                            renderBoard();
+                            await sleep(250);
+                        }
+                    } else {
+                        await sleep(200);
+                    }
+                }
+
+                msgDisplay.style.color = "#4caf50"; msgDisplay.textContent = "LEVEL COMPLETE!";
+                submitBtn.textContent = "CONTINUE TO MAP"; submitBtn.disabled = false;
+                
+                if (currentLevelIndex === unlockedIndex) {
+                    unlockedIndex++; await supabase.from('user_progress').upsert({ user_id: currentUser.id, unlocked_index: unlockedIndex });
+                }
+            } else if (movesLeft <= 0) {
+                gameOver = true; msgDisplay.style.color = "#f44336"; msgDisplay.textContent = "OUT OF MOVES!";
+                submitBtn.textContent = "TRY AGAIN"; submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
